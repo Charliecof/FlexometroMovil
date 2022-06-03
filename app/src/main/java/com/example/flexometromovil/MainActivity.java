@@ -131,7 +131,7 @@ public class MainActivity extends AppCompatActivity implements Scene.OnUpdateLis
         Node arrow1DownNode = new Node();
         arrow1DownNode.setParent(node);
         arrow1DownNode.setWorldPosition(new Vector3(node.getWorldPosition().x, node.getWorldPosition().y - 0.08f, node.getWorldPosition().z));
-        arrow1DownNode.setRenderable(arrow1UpRenderable);
+        arrow1DownNode.setRenderable(arrow1DownRenderable);
         arrow1DownNode.setOnTapListener((hitTestResult, motionEvent) -> {
             node.setWorldPosition(new Vector3(node.getWorldPosition().x, node.getWorldPosition().y - 0.01f, node.getWorldPosition().z));
         });
@@ -149,7 +149,7 @@ public class MainActivity extends AppCompatActivity implements Scene.OnUpdateLis
         Node arrow5DownNode = new Node();
         arrow5DownNode.setParent(node);
         arrow5DownNode.setWorldPosition(new Vector3(node.getWorldPosition().x, node.getWorldPosition().y - 0.167f, node.getWorldPosition().z));
-        arrow5DownNode.setRenderable(arrow1UpRenderable);
+        arrow5DownNode.setRenderable(arrow1DownRenderable);
         arrow5DownNode.setOnTapListener((hitTestResult, motionEvent) -> {
             node.setWorldPosition(new Vector3(node.getWorldPosition().x, node.getWorldPosition().y - 0.1f, node.getWorldPosition().z));
         });
@@ -261,6 +261,20 @@ public class MainActivity extends AppCompatActivity implements Scene.OnUpdateLis
                     arrow1UpRenderable = it;
                     arrow1UpRenderable.setShadowCaster(false);
                     arrow1UpRenderable.setShadowReceiver(false);
+                })
+                .exceptionally((ex) -> {
+                    AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                    builder.setMessage(ex.getMessage()).setTitle("Error");
+                    AlertDialog dialog = builder.create();
+                    dialog.show();
+                    return null;
+                });
+
+        ViewRenderable.builder().setView(this, arrow1DownLinearLayout).build()
+                .thenAccept((it) -> {
+                    arrow1DownRenderable = it;
+                    arrow1DownRenderable.setShadowCaster(false);
+                    arrow1DownRenderable.setShadowReceiver(false);
                 })
                 .exceptionally((ex) -> {
                     AlertDialog.Builder builder = new AlertDialog.Builder(this);
