@@ -8,7 +8,31 @@
     tools:context=".MainActivity">
 
     <TextView
-        android:id="@+id/distanceCard"
+        android:id="@+id/distanceCard1"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:padding="6dp"
+        android:textSize="10sp" />
+    <TextView
+        android:id="@+id/distanceCard2"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:padding="6dp"
+        android:textSize="10sp" />
+    <TextView
+        android:id="@+id/distanceCard3"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:padding="6dp"
+        android:textSize="10sp" />
+    <TextView
+        android:id="@+id/distanceCard4"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_weight="1"
