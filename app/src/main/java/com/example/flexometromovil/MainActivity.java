@@ -17,6 +17,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.google.ar.core.Anchor;
 import com.google.ar.core.ArCoreApk;
 import com.google.ar.core.HitResult;
+import com.google.ar.core.Pose;
 import com.google.ar.sceneform.AnchorNode;
 import com.google.ar.sceneform.FrameTime;
 import com.google.ar.sceneform.Node;
@@ -33,17 +34,24 @@ import com.google.ar.sceneform.ux.TransformableNode;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+
+import kotlin.collections.AbstractMutableMap;
 
 public class MainActivity extends AppCompatActivity implements Scene.OnUpdateListener {
 
     private com.google.ar.sceneform.rendering.Color arColor = new com.google.ar.sceneform.rendering.Color(Color.RED);
     private ArFragment arFragment;
+    private TextView distanceModeTextView = null;
 
     private ArrayList placedAnchors = new ArrayList<Anchor>();
     private ArrayList placedAnchorNodes = new ArrayList<AnchorNode>();
     private List fromGroundNodes = new ArrayList<List<Node>>();
+    // private AbstractMutableMap midAnchors = new AbstractMutableMap<String,Anchor>();
+    private HashMap midAnchors = new HashMap<String, Anchor>();
+    private HashMap midAnchorNodes = new HashMap<String, AnchorNode>();
 
     private ViewRenderable distanceCardViewRenderable = null;
     private ModelRenderable cubeRenderable = null;
@@ -71,12 +79,18 @@ public class MainActivity extends AppCompatActivity implements Scene.OnUpdateLis
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         arFragment = (ArFragment) getSupportFragmentManager().findFragmentById(R.id.arFragment);
+        distanceModeTextView = findViewById(R.id.distance_view);
+
         maybeEnableArButton();
 
         initArrowView();
         initRenderable();
+
         arFragment.setOnTapArPlaneListener((hitResult, plane, motionEvent) -> {
-            distanceDistanceFromGround(hitResult);
+
+            // aqui va el metodo para medir
+            //distanceDistanceFromGround(hitResult);
+            distance2Points(hitResult);
         });
 
 
@@ -93,6 +107,10 @@ public class MainActivity extends AppCompatActivity implements Scene.OnUpdateLis
         placedAnchorNodes.add(anchorNode);
 
         TransformableNode node = new TransformableNode(arFragment.getTransformationSystem());
+        node.getRotationController().setEnabled(false);
+        node.getScaleController().setEnabled(false);
+        node.getTranslationController().setEnabled(true);
+        node.setRenderable(renderable);
         node.setParent(anchorNode);
 
         arFragment.getArSceneView().getScene().addOnUpdateListener(this);
@@ -161,6 +179,84 @@ public class MainActivity extends AppCompatActivity implements Scene.OnUpdateLis
         transformableNode.select();
     }
 
+    private void distance2Points(HitResult hitResult) {
+
+        switch (placedAnchorNodes.size()) {
+            case 0:
+                placeAnchor(hitResult, cubeRenderable);
+                break;
+            case 1:
+                placeAnchor(hitResult, cubeRenderable);
+                float position[] = new float[3];
+                AnchorNode anchorNode = (AnchorNode) placedAnchorNodes.get(0);
+                position[0] = anchorNode.getWorldPosition().x / 2;
+                position[1] = anchorNode.getWorldPosition().y / 2;
+                position[2] = anchorNode.getWorldPosition().z / 2;
+                float quaternion[] = new float[4];
+                for (int i = 0; i < quaternion.length; i++)
+                    quaternion[i] = 0.0f;
+                Pose pose = new Pose(position, quaternion);
+                placeMidAnchor(pose, distanceCardViewRenderable);
+                break;
+            default:
+                clearAllAnchors();
+                placeAnchor(hitResult, cubeRenderable);
+        }
+    }
+
+    private void measureDistance2Points() {
+        if (placedAnchorNodes.size() == 2) {
+            AnchorNode anchorNode1 = (AnchorNode) placedAnchorNodes.get(0);
+            AnchorNode anchorNode2 = (AnchorNode) placedAnchorNodes.get(1);
+            float distanceMeter = calculateDistance(anchorNode1.getWorldPosition(), anchorNode2.getWorldPosition());
+            measureDistance2Points(distanceMeter);
+        }
+    }
+
+    private void measureDistance2Points(float distanceMeter) {
+        String distanceText = distanceTextCm(distanceMeter);
+        TextView textView = (TextView) distanceCardViewRenderable.getView().findViewById(R.id.distanceCard);
+        textView.setText(distanceText);
+        Log.d("Distance", "distance: " + distanceText);
+    }
+
+    private float calculateDistance(float x, float y, float z) {
+        return (float) Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2) + Math.pow(z, 2));
+    }
+
+    private float calculateDistance(Pose pose, Pose pose2) {
+        return calculateDistance(pose.tx() - pose2.tx(), pose.ty() - pose2.ty(), pose.ty() - pose2.ty());
+    }
+
+    private float calculateDistance(Vector3 object1, Vector3 object2) {
+        return calculateDistance(object1.x - object2.x, object1.y - object2.y, object1.z - object2.z);
+    }
+
+    private float calculateDistance(Vector3 object1, Pose object2) {
+        return calculateDistance(object1.x - object2.tx(), object1.y - object2.ty(), object1.z - object2.tz());
+    }
+
+    private void placeMidAnchor(Pose pose, Renderable renderable) {
+        String midKey = "0_1";
+        Anchor anchor = arFragment.getArSceneView().getSession().createAnchor(pose);
+        midAnchors.put(midKey, anchor);
+
+        AnchorNode anchorNode = new AnchorNode(anchor);
+        anchorNode.setSmoothed(true);
+        anchorNode.setParent(arFragment.getArSceneView().getScene());
+        midAnchorNodes.put(midKey, anchorNode);
+
+        TransformableNode node = new TransformableNode(arFragment.getTransformationSystem());
+        node.getRotationController().setEnabled(false);
+        node.getScaleController().setEnabled(false);
+        node.getTranslationController().setEnabled(true);
+        node.setRenderable(renderable);
+        node.setParent(anchorNode);
+
+        arFragment.getArSceneView().getScene().addOnUpdateListener(this);
+        arFragment.getArSceneView().getScene().addChild(anchorNode);
+    }
+
     void maybeEnableArButton() {
         ArCoreApk.Availability availability = ArCoreApk.getInstance().checkAvailability(this);
         if (availability.isTransient()) {
@@ -179,15 +275,15 @@ public class MainActivity extends AppCompatActivity implements Scene.OnUpdateLis
     }
 
     private void measureDistanceFromGround() {
-        if (fromGroundNodes.size() == 0) return ;
+        if (fromGroundNodes.size() == 0) return;
         int aux2 = 0;
-        for(Iterator<ArrayList> nodeArrayList = fromGroundNodes.iterator(); nodeArrayList.hasNext(); ){
+        for (Iterator<ArrayList> nodeArrayList = fromGroundNodes.iterator(); nodeArrayList.hasNext(); ) {
             List<Node> aux = nodeArrayList.next();
             TextView textView = distanceCardViewRenderable.getView().findViewById(R.id.distanceCard);
-            Float distance = changeUnit( aux.get(aux2).getWorldPosition().y+1.0f,"cm");
-            textView.setText(distance+" cm");
+            Float distance = changeUnit(aux.get(aux2).getWorldPosition().y + 1.0f, "cm");
+            textView.setText(distance + " cm");
             Log.d("Debugg", String.valueOf(aux));
-            aux2+=1;
+            aux2 += 1;
         }
 
         Toast.makeText(this, "measuring", Toast.LENGTH_SHORT).show();
@@ -228,13 +324,15 @@ public class MainActivity extends AppCompatActivity implements Scene.OnUpdateLis
     }
 
     private void initRenderable() {
-        MaterialFactory.makeTransparentWithColor(this, arColor)
+        MaterialFactory
+                .makeTransparentWithColor(this, new com.google.ar.sceneform.rendering.Color(Color.BLUE))
                 .thenAccept((Material material) -> {
                     cubeRenderable = ShapeFactory.makeSphere(0.02f, Vector3.zero(), material);
                     cubeRenderable.setShadowCaster(false);
                     cubeRenderable.setShadowReceiver(false);
                 })
                 .exceptionally((ex) -> {
+                    Toast.makeText(this, "Error Rendering point ", Toast.LENGTH_SHORT).show();
                     AlertDialog.Builder builder = new AlertDialog.Builder(this);
                     builder.setMessage(ex.getMessage()).setTitle("Error");
                     AlertDialog dialog = builder.create();
@@ -242,7 +340,10 @@ public class MainActivity extends AppCompatActivity implements Scene.OnUpdateLis
                     return null;
                 });
 
-        ViewRenderable.builder().setView(this, R.layout.distance_layout).build()
+        ViewRenderable
+                .builder()
+                .setView(this, R.layout.distance_layout)
+                .build()
                 .thenAccept((it) -> {
                     distanceCardViewRenderable = it;
                     distanceCardViewRenderable.setShadowCaster(false);
@@ -256,7 +357,9 @@ public class MainActivity extends AppCompatActivity implements Scene.OnUpdateLis
                     return null;
                 });
 
-        ViewRenderable.builder().setView(this, arrow1UpLinearLayout).build()
+        ViewRenderable
+                .builder()
+                .setView(this, arrow1UpLinearLayout).build()
                 .thenAccept((it) -> {
                     arrow1UpRenderable = it;
                     arrow1UpRenderable.setShadowCaster(false);
@@ -270,7 +373,10 @@ public class MainActivity extends AppCompatActivity implements Scene.OnUpdateLis
                     return null;
                 });
 
-        ViewRenderable.builder().setView(this, arrow1DownLinearLayout).build()
+        ViewRenderable
+                .builder()
+                .setView(this, arrow1DownLinearLayout)
+                .build()
                 .thenAccept((it) -> {
                     arrow1DownRenderable = it;
                     arrow1DownRenderable.setShadowCaster(false);
@@ -283,6 +389,65 @@ public class MainActivity extends AppCompatActivity implements Scene.OnUpdateLis
                     dialog.show();
                     return null;
                 });
+
+        ViewRenderable
+                .builder()
+                .setView(this, arrow5UpLinearLayout)
+                .build()
+                .thenAccept((it) -> {
+                    arrow5UpRenderable = it;
+                    arrow5UpRenderable.setShadowCaster(false);
+                    arrow5UpRenderable.setShadowReceiver(false);
+                })
+                .exceptionally((ex) -> {
+                    AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                    builder.setMessage(ex.getMessage()).setTitle("Error");
+                    AlertDialog dialog = builder.create();
+                    dialog.show();
+                    return null;
+                });
+
+        ViewRenderable
+                .builder()
+                .setView(this, arrow5DownLinearLayout)
+                .build()
+                .thenAccept((it) -> {
+                    arrow5DownRenderable = it;
+                    arrow5DownRenderable.setShadowCaster(false);
+                    arrow5DownRenderable.setShadowReceiver(false);
+                })
+                .exceptionally((ex) -> {
+                    AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                    builder.setMessage(ex.getMessage()).setTitle("Error");
+                    AlertDialog dialog = builder.create();
+                    dialog.show();
+                    return null;
+                });
+    }
+
+    private void clearAllAnchors() {
+        placedAnchors.clear();
+        if (placedAnchorNodes.size() <= 0 || midAnchorNodes.size() <= 0) return;
+        Log.d("Clear anchors", "Clearing"+placedAnchorNodes.size());
+        for (int i = 0; i < placedAnchorNodes.size(); i++) {
+            AnchorNode anchorNode = (AnchorNode) placedAnchorNodes.get(i);
+            arFragment.getArSceneView().getScene().removeChild(anchorNode);
+            anchorNode.setEnabled(false);
+            anchorNode.getAnchor().detach();
+            anchorNode.setParent(null);
+        }
+        placedAnchorNodes.clear();
+        midAnchors.clear();
+        for (int i = 0; i < midAnchorNodes.size(); i++) {
+            AnchorNode anchorNode = (AnchorNode) midAnchorNodes.get(i);
+            arFragment.getArSceneView().getScene().removeChild(anchorNode);
+            anchorNode.setEnabled(false);
+            anchorNode.getAnchor().detach();
+            anchorNode.setParent(null);
+        }
+        midAnchorNodes.clear();
+
+        fromGroundNodes.clear();
     }
 
     private Float changeUnit(Float distancia, String unidad) {
@@ -299,10 +464,15 @@ public class MainActivity extends AppCompatActivity implements Scene.OnUpdateLis
         return distancia;
     }
 
+    private String distanceTextCm(float distanceMeter) {
+        float distance = changeUnit(distanceMeter, "cm");
+        String distanceCM = "" + distance;
+        return distanceCM + " cm";
+    }
+
     @Override
     public void onUpdate(FrameTime frameTime) {
-        Toast.makeText(this, "updating", Toast.LENGTH_SHORT).show();
-        measureDistanceFromGround();
-
+        //measureDistanceFromGround();
+        measureDistance2Points();
     }
 }
